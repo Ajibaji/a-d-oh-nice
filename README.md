@@ -1,2 +1,2 @@
 # a-d-oh-nice
-Git clone a whole ADO organisation in one fell swoop
+Shell script for cloning all repos in an ado project. It git clones into the directory from which it is run
