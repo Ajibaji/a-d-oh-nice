@@ -1,61 +1,61 @@
-#!/bin/sh
+#!/bin/bash
+PROJECT=$@
+resetColour=`echo -e '\033[0m'`
+colours=('\033[1;31m' '\033[1;32m' '\033[1;33m' '\033[1;34m' '\033[1;35m' '\033[1;36m' '\033[1;37m' '\033[1;38m' '\033[1;39m' '\033[0;31m' '\033[0;32m' '\033[2;33m' '\033[2;34m' '\033[2;35m' '\033[2;36m' '\033[2;37m' '\033[2;38m' '\033[2;39m')
 
-dirname="$(date +'Backup-%Y%m%d')"
-
-function init () {
-    az login
-    az extension add --name azure-devops
-    mkdir $dirname && cd $_
+function prepend_output () {
+    local streamTitle=$1
+    local streamColour=$2
+    streamTitle=$(awk '{x=$0;for(i=length;i<40;i++)x=x " ";}END{print x}' <<< "$streamTitle")
+    sed -e "s/^/${streamColour}${streamTitle}${resetColour}| /"
 }
 
-function getRepoList () {
-    list=$(az repos list --org $1 --project $2 | jq -r '.[] | select(.name | contains ("smp")) | .sshUrl')
+function getRepoList() {
+    az repos list --org 'https://dev.azure.com/ajgre' --project "$PROJECT" --query [].[name,sshUrl] --output tsv
 }
 
-function replace () {
-    echo "replaces token and secrets"    
-}
-
-function acr_login () {
-    az acr login --name $1
-}
-
-function cloneRepos () {
-    for url in $list; do
-        git clone $url &
-    done
-    echo "Cloning repos..."
-    wait
-    clear
-    echo "all done"
+function cloneRepos() {
+  echo "Cloning repos..."
+  getRepoList | while read line
+  do
+    local streamColour=`echo -e "${colours[RANDOM%${#colours[@]}]}"`
+    local name=$(echo $line | awk '{print $1}')
+    local sshUrl=$(echo $line | awk '{print $2}')
+    git clone $sshUrl | prepend_output $name $streamColour &
+    echo $sshUrl | prepend_output $name $streamColour &
+  done
+  wait
 }
 
 function menu(){
-	clear
-	while [ true ]
-	do
-		echo "1 - Clone all 'SMP' prefixed repos"
-        echo "(q)uit"
-        
-        echo $list
-        list=''
-
-		read question
-
-		if [ $question == '1' ]
-		then
-			init
-			acr_login
-			getRepoList
-			cloneRepos
-			exit 0
-		elif [ $question == 'q' ]
-		then
-			clear
-			exit 0
-		fi
-	done
+  clear
+  while [ true ]
+  do
+    echo "1 - login to ADO (if not already)"
+    echo "2 - install azure-devops extension for az-cli"
+    echo "3 - Clone all repos in ${PROJECT}"
+    echo ""
+    echo "   (q)uit"
+    read question
+   
+    if [ $question == '1' ]
+    then
+      az login
+      clear
+    elif [ $question == '2' ]
+    then
+      az extension add --name azure-devops
+      clear
+    elif [ $question == '3' ]
+    then
+      cloneRepos
+      exit 0
+    elif [ $question == 'q' ]
+    then
+      clear
+      exit 0
+    fi
+  done
 }
 
-clear
 menu
